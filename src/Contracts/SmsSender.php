@@ -1,6 +1,6 @@
 <?php
 
-namespace Markt\LaravelAuth\contracts;
+namespace Markt\LaravelAuth\Contracts;
 
 interface SmsSender
 {
