@@ -1,0 +1,32 @@
+{
+  "name": "markt/laravel-auth",
+  "description": "Reusable authentication infrastructure for Laravel applications.",
+  "type": "library",
+  "require": {
+    "laravel/framework": "^13.0",
+    "laravel/sanctum": "^4.3"
+  },
+  "require-dev": {
+    "orchestra/testbench": "^11.0"
+  },
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "Markt\\LaravelAuth\\": "src/"
+    }
+  },
+  "authors": [
+    {
+      "name": "Mark Talamson",
+      "email": "marktalamson@gmail.com"
+    }
+  ],
+  "minimum-stability": "stable",
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Markt\\LaravelAuth\\LaravelAuthServiceProvider"
+      ]
+    }
+  }
+}
