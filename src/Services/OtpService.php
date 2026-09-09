@@ -53,6 +53,10 @@ class OtpService
             return false;
         }
 
+        if ($otpRecord->verified_at !== null) {
+            return false;
+        }
+
         if ($otpRecord->expires_at->isPast()) {
             return false;
         }
@@ -63,6 +67,14 @@ class OtpService
 
         $otpRecord->increment('attempts');
 
-        return Hash::check($otp, $otpRecord->otp_hash);
+        if (!Hash::check($otp, $otpRecord->otp_hash)) {
+            return false;
+        }
+
+        $otpRecord->update([
+            'verified_at' => now(),
+        ]);
+
+        return true;
     }
 }
