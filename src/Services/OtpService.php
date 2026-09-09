@@ -3,6 +3,8 @@
 namespace Markt\LaravelAuth\Services;
 
 use Markt\LaravelAuth\Contracts\SmsSender;
+use Illuminate\Support\Facades\Hash;
+use Markt\LaravelAuth\Models\Otp;
 
 class OtpService
 {
@@ -10,11 +12,20 @@ class OtpService
 
     public function send(string $phoneNumber): void
     {
-        //Get the otp
+        //variables
+        $expiresAt = now()->addMinutes(config('laravel-auth.otp.expires_in'));
         $otp = $this->generateOtp();
 
-        // Save OTP...
-        //TODO write code for saving
+        // Hash the otp
+        $otpHash = Hash::make($otp);
+
+        //Save the hashed otp
+        Otp::create([
+            'phone_number' => $phoneNumber,
+            'otp_hash' => $otpHash,
+            'expires_at' => $expiresAt,
+            'attempts' => 0,
+        ]);
 
         //Send OTP as Sms
         $this->smsSender->send(
