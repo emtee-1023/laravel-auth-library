@@ -19,5 +19,9 @@ class LaravelAuthServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../config/laravel-auth.php' => config_path('laravel-auth.php'),
         ], 'laravel-auth-config');
+
+        $this->publishes([
+            __DIR__ . '/../database/migrations' => database_path('migrations'),
+        ], 'laravel-auth-migrations');
     }
 }

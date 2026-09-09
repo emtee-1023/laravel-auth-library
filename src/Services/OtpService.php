@@ -25,6 +25,10 @@ class OtpService
 
     private function generateOtp(): string
     {
-        return "676767";
+        $length = config('laravel-auth.otp.length');
+        $min = $length ** ($length - 1);
+        $max = (10 ** $length) - 1;
+
+        return (string) random_int($min, $max);
     }
 }
