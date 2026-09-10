@@ -13,12 +13,14 @@ class Otp extends Model
         'otp_hash',
         'expires_at',
         'attempts',
+        'verified_at',
     ];
 
     protected function casts(): array
     {
         return [
             'expires_at' => 'datetime',
+            'verified_at' => 'datetime'
         ];
     }
 }
