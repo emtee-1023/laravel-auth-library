@@ -10,6 +10,15 @@ class OtpService
 {
     public function __construct(private SmsSender $smsSender) {}
 
+    private function generateOtp(): string
+    {
+        $length = config('laravel-auth.otp.length');
+        $min = $length ** ($length - 1);
+        $max = (10 ** $length) - 1;
+
+        return (string) random_int($min, $max);
+    }
+
     public function send(string $phoneNumber): void
     {
         //variables
@@ -34,12 +43,26 @@ class OtpService
         );
     }
 
-    private function generateOtp(): string
+    public function verify(string $phoneNumber, string $otp): bool
     {
-        $length = config('laravel-auth.otp.length');
-        $min = $length ** ($length - 1);
-        $max = (10 ** $length) - 1;
+        $otpRecord = Otp::where('phone_number', $phoneNumber)
+            ->latest()
+            ->first();
 
-        return (string) random_int($min, $max);
+        if (! $otpRecord) {
+            return false;
+        }
+
+        if ($otpRecord->expires_at->isPast()) {
+            return false;
+        }
+
+        if ($otpRecord->attempts >= config('laravel-auth.otp.max_attempts')) {
+            return false;
+        }
+
+        $otpRecord->increment('attempts');
+
+        return Hash::check($otp, $otpRecord->otp_hash);
     }
 }

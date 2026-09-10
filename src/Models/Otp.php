@@ -14,4 +14,11 @@ class Otp extends Model
         'expires_at',
         'attempts',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'expires_at' => 'datetime',
+        ];
+    }
 }
