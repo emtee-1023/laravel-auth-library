@@ -10,6 +10,10 @@ use Markt\LaravelAuth\Http\Requests\VerifyPhoneRequest;
 use Markt\LaravelAuth\Http\Requests\ForgotPasswordRequest;
 use Markt\LaravelAuth\Http\Requests\ResetPasswordRequest;
 use Markt\LaravelAuth\Services\AuthService;
+use Markt\LaravelAuth\Http\Requests\EnableTwoFactorRequest;
+use Markt\LaravelAuth\Http\Requests\ConfirmTwoFactorRequest;
+use Markt\LaravelAuth\Http\Requests\DisableTwoFactorRequest;
+use Markt\LaravelAuth\Http\Requests\VerifyTwoFactorRequest;
 
 class AuthController
 {
@@ -33,9 +37,8 @@ class AuthController
         ], 201);
     }
 
-    public function verifyPhone(
-        VerifyPhoneRequest $request
-    ): JsonResponse {
+    public function verifyPhone(VerifyPhoneRequest $request): JsonResponse
+    {
         $verified = $this->authService->verifyPhone(
             phoneNumber: $request->string('phone_number')->toString(),
             otp: $request->string('otp')->toString(),
@@ -54,14 +57,22 @@ class AuthController
 
     public function login(LoginRequest $request): JsonResponse
     {
-        $token = $this->authService->login(
+        $result = $this->authService->login(
             phoneNumber: $request->string('phone_number')->toString(),
             password: $request->string('password')->toString(),
         );
 
+        if ($result['requires_two_factor']) {
+            return response()->json([
+                'message' => 'Two-factor authentication required.',
+                'requires_two_factor' => true,
+                'challenge_token' => $result['challenge_token'],
+            ]);
+        }
+
         return response()->json([
             'message' => 'Login successful.',
-            'token' => $token->plainTextToken,
+            'token' => $result['token']->plainTextToken,
             'token_type' => 'Bearer',
         ]);
     }
@@ -109,6 +120,73 @@ class AuthController
 
         return response()->json([
             'message' => 'Password reset successfully.',
+        ]);
+    }
+
+    public function enableTwoFactor(EnableTwoFactorRequest $request): JsonResponse
+    {
+        $this->authService->enableTwoFactor(
+            $request->user()
+        );
+
+        return response()->json([
+            'message' => 'A verification code has been sent to your phone.',
+        ]);
+    }
+
+    public function confirmTwoFactor(ConfirmTwoFactorRequest $request): JsonResponse
+    {
+        $confirmed = $this->authService->confirmTwoFactor(
+            user: $request->user(),
+            otp: $request->string('otp')->toString(),
+        );
+
+        if (!$confirmed) {
+            return response()->json([
+                'message' => 'Invalid or expired verification code.',
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => 'Two-factor authentication enabled successfully.',
+        ]);
+    }
+
+    public function disableTwoFactor(DisableTwoFactorRequest $request): JsonResponse
+    {
+        $disabled = $this->authService->disableTwoFactor(
+            user: $request->user(),
+            password: $request->string('password')->toString(),
+        );
+
+        if (!$disabled) {
+            return response()->json([
+                'message' => 'The provided password is incorrect.',
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => 'Two-factor authentication disabled successfully.',
+        ]);
+    }
+
+    public function verifyTwoFactor(VerifyTwoFactorRequest $request): JsonResponse
+    {
+        $token = $this->authService->verifyTwoFactorLogin(
+            challengeToken: $request->string('challenge_token')->toString(),
+            otp: $request->string('otp')->toString(),
+        );
+
+        if (!$token) {
+            return response()->json([
+                'message' => 'Invalid or expired verification code.',
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => 'Login successful.',
+            'token' => $token->plainTextToken,
+            'token_type' => 'Bearer',
         ]);
     }
 }

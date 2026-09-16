@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Markt\LaravelAuth\Models\Otp;
 use Markt\LaravelAuth\Enums\OtpPurpose;
+use Illuminate\Support\Str;
 
 class AuthService
 {
@@ -39,10 +40,8 @@ class AuthService
         return $user;
     }
 
-    public function verifyPhone(
-        string $phoneNumber,
-        string $otp
-    ): bool {
+    public function verifyPhone(string $phoneNumber, string $otp): bool
+    {
         $verified = $this->otpService->verify(
             $phoneNumber,
             $otp,
@@ -68,13 +67,14 @@ class AuthService
         return true;
     }
 
-    public function login(
-        string $phoneNumber,
-        string $password
-    ) {
+    public function login(string $phoneNumber, string $password): array
+    {
         $userModel = config('laravel-auth.models.user');
 
-        $user = $userModel::where('phone_number', $phoneNumber)->first();
+        $user = $userModel::where(
+            'phone_number',
+            $phoneNumber
+        )->first();
 
         if (
             !$user ||
@@ -90,6 +90,76 @@ class AuthService
                 'phone_number' => 'Your phone number has not been verified.',
             ]);
         }
+
+        if (!config('laravel-auth.two_factor.enabled') || !$this->isTwoFactorEnabled($user)) {
+            return [
+                'requires_two_factor' => false,
+                'token' => $user->createToken('auth-token'),
+            ];
+        }
+
+        // Password is correct, but 2FA is required.
+        $this->otpService->send(
+            $user->phone_number,
+            OtpPurpose::TwoFactor
+        );
+
+        $challengeModel = config(
+            'laravel-auth.models.two_factor_challenge'
+        );
+
+        $challenge = $challengeModel::create([
+            'user_id' => $user->id,
+            'token' => Str::random(64),
+            'expires_at' => now()->addMinutes(
+                config('laravel-auth.two_factor.challenge_expires_in')
+            ),
+        ]);
+
+        return [
+            'requires_two_factor' => true,
+            'challenge_token' => $challenge->token,
+        ];
+    }
+
+    public function verifyTwoFactorLogin(string $challengeToken, string $otp)
+    {
+        $challengeModel = config('laravel-auth.models.two_factor_challenge');
+
+        $challenge = $challengeModel::where('token', $challengeToken)->first();
+
+        if (!$challenge) {
+            return null;
+        }
+
+        if ($challenge->expires_at->isPast()) {
+            $challenge->delete();
+
+            return null;
+        }
+
+        $userModel = config('laravel-auth.models.user');
+
+        $user = $userModel::find($challenge->user_id);
+
+        if (!$user || !$this->isTwoFactorEnabled($user)) {
+            $challenge->delete();
+
+            return null;
+        }
+
+        $verified = $this->otpService->verify(
+            $user->phone_number,
+            $otp,
+            OtpPurpose::TwoFactor
+        );
+
+        if (!$verified) {
+            return null;
+        }
+
+        // Challenge has served its purpose.
+        $challenge->delete();
 
         return $user->createToken('auth-token');
     }
@@ -149,5 +219,61 @@ class AuthService
         $user->tokens()->delete();
 
         return true;
+    }
+
+    public function enableTwoFactor($user): void
+    {
+        $this->otpService->send(
+            $user->phone_number,
+            OtpPurpose::TwoFactor
+        );
+    }
+
+    public function confirmTwoFactor($user, string $otp): bool
+    {
+        $verified = $this->otpService->verify($user->phone_number, $otp, OtpPurpose::TwoFactor);
+
+        if (!$verified) {
+            return false;
+        }
+
+        $this->setTwoFactorEnabled($user, true);
+
+        return true;
+    }
+
+    public function disableTwoFactor($user, string $password): bool
+    {
+        if (!Hash::check($password, $user->password)) {
+            return false;
+        }
+
+        $this->setTwoFactorEnabled($user, false);
+
+        $challengeModel = config('laravel-auth.models.two_factor_challenge');
+        $challengeModel::where('user_id', $user->id)->delete();
+
+        return true;
+    }
+
+    private function isTwoFactorEnabled($user): bool
+    {
+        $settingModel = config(
+            'laravel-auth.models.two_factor_setting'
+        );
+
+        return $settingModel::where('user_id', $user->id)->value('enabled') === true;
+    }
+
+    private function setTwoFactorEnabled($user, bool $enabled): void
+    {
+        $settingModel = config(
+            'laravel-auth.models.two_factor_setting'
+        );
+
+        $settingModel::updateOrCreate(
+            ['user_id' => $user->id,],
+            ['enabled' => $enabled,]
+        );
     }
 }

@@ -5,11 +5,15 @@ namespace Markt\LaravelAuth\Services;
 use Markt\LaravelAuth\Contracts\SmsSender;
 use Illuminate\Support\Facades\Hash;
 use Markt\LaravelAuth\Enums\OtpPurpose;
-use Markt\LaravelAuth\Models\Otp;
 
 class OtpService
 {
     public function __construct(private SmsSender $smsSender) {}
+
+    private function otpModel()
+    {
+        return config('laravel-auth.models.otp');
+    }
 
     private function generateOtp(): string
     {
@@ -22,7 +26,9 @@ class OtpService
 
     public function send(string $phoneNumber, OtpPurpose $purpose): void
     {
-        Otp::where('phone_number', $phoneNumber)
+        $otpModel = $this->otpModel();
+
+        $otpModel::where('phone_number', $phoneNumber)
             ->where('purpose', $purpose->value)
             ->whereNull('verified_at')
             ->update([
@@ -37,7 +43,7 @@ class OtpService
         $otpHash = Hash::make($otp);
 
         //Save the hashed otp
-        Otp::create([
+        $otpModel::create([
             'phone_number' => $phoneNumber,
             'purpose' => $purpose->value,
             'otp_hash' => Hash::make($otp),
@@ -55,7 +61,9 @@ class OtpService
 
     public function verify(string $phoneNumber, string $otp, OtpPurpose $purpose): bool
     {
-        $otpRecord = Otp::where('phone_number', $phoneNumber)
+        $otpModel = $this->otpModel();
+
+        $otpRecord = $otpModel::where('phone_number', $phoneNumber)
             ->where('purpose', $purpose->value)
             ->latest()
             ->first();
