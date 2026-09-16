@@ -65,22 +65,18 @@ class OtpService
 
         $otpRecord = $otpModel::where('phone_number', $phoneNumber)
             ->where('purpose', $purpose->value)
+            ->whereNull('verified_at')
+            ->where('expires_at', '>', now())
+            ->where(
+                'attempts',
+                '<',
+                config('laravel-auth.otp.max_attempts')
+            )
             ->latest()
             ->first();
 
-        if (! $otpRecord) {
-            return false;
-        }
 
-        if ($otpRecord->verified_at !== null) {
-            return false;
-        }
-
-        if ($otpRecord->expires_at->isPast()) {
-            return false;
-        }
-
-        if ($otpRecord->attempts >= config('laravel-auth.otp.max_attempts')) {
+        if (!$otpRecord) {
             return false;
         }
 
