@@ -104,4 +104,48 @@ class AuthService
 
         $user->currentAccessToken()?->delete();
     }
+
+    public function requestPasswordReset(string $phoneNumber): void
+    {
+        $userModel = config('laravel-auth.models.user');
+
+        $userExists = $userModel::where(
+            'phone_number',
+            $phoneNumber
+        )->exists();
+
+
+        if (!$userExists) {
+            return; //This is a more secure approach since someone cannot check which phone numbers 'exist'
+        }
+
+        $this->otpService->send($phoneNumber);
+    }
+
+    public function resetPassword(string $phoneNumber, string $otp, string $password): bool
+    {
+        if (!$this->otpService->verify($phoneNumber, $otp)) {
+            return false;
+        }
+
+        $userModel = config('laravel-auth.models.user');
+
+        $user = $userModel::where(
+            'phone_number',
+            $phoneNumber
+        )->first();
+
+        if (!$user) {
+            return false;
+        }
+
+        $user->update([
+            'password' => Hash::make($password),
+        ]);
+
+        // Invalidate all existing sessions/tokens.
+        $user->tokens()->delete();
+
+        return true;
+    }
 }

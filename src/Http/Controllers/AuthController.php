@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Markt\LaravelAuth\Http\Requests\LoginRequest;
 use Markt\LaravelAuth\Http\Requests\RegisterRequest;
 use Markt\LaravelAuth\Http\Requests\VerifyPhoneRequest;
+use Markt\LaravelAuth\Http\Requests\ForgotPasswordRequest;
+use Markt\LaravelAuth\Http\Requests\ResetPasswordRequest;
 use Markt\LaravelAuth\Services\AuthService;
 
 class AuthController
@@ -77,6 +79,36 @@ class AuthController
     {
         return response()->json([
             'user' => $request->user(),
+        ]);
+    }
+
+    public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
+    {
+        $this->authService->requestPasswordReset(
+            $request->string('phone_number')->toString(),
+        );
+
+        return response()->json([
+            'message' => 'If an account exists for this phone number, a verification code has been sent.',
+        ]);
+    }
+
+    public function resetPassword(ResetPasswordRequest $request): JsonResponse
+    {
+        $reset = $this->authService->resetPassword(
+            phoneNumber: $request->string('phone_number')->toString(),
+            otp: $request->string('otp')->toString(),
+            password: $request->string('password')->toString(),
+        );
+
+        if (!$reset) {
+            return response()->json([
+                'message' => 'Invalid or expired verification code.',
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => 'Password reset successfully.',
         ]);
     }
 }
