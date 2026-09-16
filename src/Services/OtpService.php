@@ -21,7 +21,13 @@ class OtpService
 
     public function send(string $phoneNumber): void
     {
-        //variables
+        Otp::where('phone_number', $phoneNumber)
+            ->whereNull('verified_at')
+            ->update([
+                'verified_at' => now(),
+            ]);
+
+        // generate + save + send...
         $expiresAt = now()->addMinutes(config('laravel-auth.otp.expires_in'));
         $otp = $this->generateOtp();
 
