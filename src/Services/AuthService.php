@@ -5,6 +5,7 @@ namespace Markt\LaravelAuth\Services;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Markt\LaravelAuth\Models\Otp;
+use Markt\LaravelAuth\Enums\OtpPurpose;
 
 class AuthService
 {
@@ -33,7 +34,7 @@ class AuthService
             ]
         ));
 
-        $this->otpService->send($phoneNumber);
+        $this->otpService->send($phoneNumber, OtpPurpose::Registration);
 
         return $user;
     }
@@ -44,7 +45,8 @@ class AuthService
     ): bool {
         $verified = $this->otpService->verify(
             $phoneNumber,
-            $otp
+            $otp,
+            OtpPurpose::Registration
         );
 
         if (!$verified) {
@@ -119,12 +121,12 @@ class AuthService
             return; //This is a more secure approach since someone cannot check which phone numbers 'exist'
         }
 
-        $this->otpService->send($phoneNumber);
+        $this->otpService->send($phoneNumber, OtpPurpose::PasswordReset);
     }
 
     public function resetPassword(string $phoneNumber, string $otp, string $password): bool
     {
-        if (!$this->otpService->verify($phoneNumber, $otp)) {
+        if (!$this->otpService->verify($phoneNumber, $otp, OtpPurpose::PasswordReset)) {
             return false;
         }
 
