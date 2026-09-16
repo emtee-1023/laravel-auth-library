@@ -37,4 +37,7 @@ return [
             'decay_seconds' => 300,
         ],
     ],
+    'routes' => [
+        'prefix' => 'api',
+    ],
 ];

@@ -3,6 +3,7 @@
 namespace Markt\LaravelAuth;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
 
@@ -32,6 +33,12 @@ class LaravelAuthServiceProvider extends ServiceProvider
         $this->loadRoutesFrom(
             __DIR__ . '/routes/api.php'
         );
+
+        //prefix the routes
+        Route::prefix(config('laravel-auth.routes.prefix'))
+            ->group(
+                __DIR__ . '/routes/api.php'
+            );
 
         //login rate limiter
         RateLimiter::for('laravel-auth-login', function ($request) {
