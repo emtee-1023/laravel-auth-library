@@ -46,7 +46,7 @@ class OtpService
         $otpModel::create([
             'phone_number' => $phoneNumber,
             'purpose' => $purpose->value,
-            'otp_hash' => Hash::make($otp),
+            'otp_hash' => $otpHash,
             'expires_at' => $expiresAt,
             'attempts' => 0,
             'verified_at' => null,
@@ -93,10 +93,10 @@ class OtpService
         return true;
     }
 
-    public function cleanupExpired(): void
+    public function cleanupExpired(): int
     {
         $otpModel = $this->otpModel();
 
-        $otpModel::where('expires_at', '<', now())->delete();
+        return $otpModel::where('expires_at', '<', now())->delete();
     }
 }
