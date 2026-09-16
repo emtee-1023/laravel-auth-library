@@ -6,6 +6,8 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
+use Markt\LaravelAuth\Console\Commands\LaravelAuthCleanupCommand;
+use Illuminate\Console\Scheduling\Schedule;
 
 class LaravelAuthServiceProvider extends ServiceProvider
 {
@@ -69,5 +71,18 @@ class LaravelAuthServiceProvider extends ServiceProvider
                     )
                 );
         });
+
+        //php artisan command to remove expired otps and 2fa challenges 'php artisan laravel-auth:cleanup' (runs every 10 minutes)
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                LaravelAuthCleanupCommand::class,
+            ]);
+
+            $this->app->booted(function () {
+                $this->app->make(Schedule::class)
+                    ->command('laravel-auth:cleanup')
+                    ->everyTenMinutes();
+            });
+        }
     }
 }

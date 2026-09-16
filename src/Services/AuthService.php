@@ -4,14 +4,14 @@ namespace Markt\LaravelAuth\Services;
 
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
-use Markt\LaravelAuth\Models\Otp;
 use Markt\LaravelAuth\Enums\OtpPurpose;
-use Illuminate\Support\Str;
 
 class AuthService
 {
     public function __construct(
         private OtpService $otpService,
+        private TwoFactorChallengeService $twoFactorChallengeService,
+
     ) {}
 
     public function register(
@@ -104,19 +104,7 @@ class AuthService
             OtpPurpose::TwoFactor
         );
 
-        $challengeModel = config(
-            'laravel-auth.models.two_factor_challenge'
-        );
-
-        $challengeModel::where('user_id', $user->id)->delete();
-
-        $challenge = $challengeModel::create([
-            'user_id' => $user->id,
-            'token' => Str::random(64),
-            'expires_at' => now()->addMinutes(
-                config('laravel-auth.two_factor.challenge_expires_in')
-            ),
-        ]);
+        $challenge = $this->twoFactorChallengeService->create($user);
 
         return [
             'requires_two_factor' => true,
@@ -126,9 +114,8 @@ class AuthService
 
     public function verifyTwoFactorLogin(string $challengeToken, string $otp)
     {
-        $challengeModel = config('laravel-auth.models.two_factor_challenge');
 
-        $challenge = $challengeModel::where('token', $challengeToken)->where('expires_at', '>', now())->first();
+        $challenge = $this->twoFactorChallengeService->findValid($challengeToken);
 
         if (!$challenge) {
             return null;
@@ -139,8 +126,7 @@ class AuthService
         $user = $userModel::find($challenge->user_id);
 
         if (!$user || !$this->isTwoFactorEnabled($user)) {
-            $challenge->delete();
-
+            $this->twoFactorChallengeService->consume($challenge);
             return null;
         }
 
@@ -155,7 +141,7 @@ class AuthService
         }
 
         // Challenge has served its purpose.
-        $challenge->delete();
+        $this->twoFactorChallengeService->consume($challenge);
 
         return $user->createToken('auth-token');
     }
@@ -271,12 +257,5 @@ class AuthService
             ['user_id' => $user->id,],
             ['enabled' => $enabled,]
         );
-    }
-
-    private function cleanupExpiredChallenges(): void
-    {
-        $challengeModel = config('laravel-auth.models.two_factor_challenge');
-
-        $challengeModel::where('expires_at', '<', now())->delete();
     }
 }
