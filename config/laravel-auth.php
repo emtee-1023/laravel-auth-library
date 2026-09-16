@@ -16,4 +16,25 @@ return [
         'enabled' => 'true',
         'challenge_expires_in' => 5, //minutes
     ],
+    'rate_limits' => [
+        'login' => [
+            'attempts' => 5,
+            'decay_seconds' => 60,
+        ],
+
+        'otp_verification' => [
+            'attempts' => 5,
+            'decay_seconds' => 300,
+        ],
+
+        'password_reset' => [
+            'attempts' => 3,
+            'decay_seconds' => 300,
+        ],
+
+        'two_factor' => [
+            'attempts' => 5,
+            'decay_seconds' => 300,
+        ],
+    ],
 ];
