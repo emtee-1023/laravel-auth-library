@@ -92,4 +92,11 @@ class OtpService
 
         return true;
     }
+
+    public function cleanupExpired(): void
+    {
+        $otpModel = $this->otpModel();
+
+        $otpModel::where('expires_at', '<', now())->delete();
+    }
 }

@@ -108,6 +108,8 @@ class AuthService
             'laravel-auth.models.two_factor_challenge'
         );
 
+        $challengeModel::where('user_id', $user->id)->delete();
+
         $challenge = $challengeModel::create([
             'user_id' => $user->id,
             'token' => Str::random(64),
@@ -126,15 +128,9 @@ class AuthService
     {
         $challengeModel = config('laravel-auth.models.two_factor_challenge');
 
-        $challenge = $challengeModel::where('token', $challengeToken)->first();
+        $challenge = $challengeModel::where('token', $challengeToken)->where('expires_at', '>', now())->first();
 
         if (!$challenge) {
-            return null;
-        }
-
-        if ($challenge->expires_at->isPast()) {
-            $challenge->delete();
-
             return null;
         }
 
@@ -275,5 +271,12 @@ class AuthService
             ['user_id' => $user->id,],
             ['enabled' => $enabled,]
         );
+    }
+
+    private function cleanupExpiredChallenges(): void
+    {
+        $challengeModel = config('laravel-auth.models.two_factor_challenge');
+
+        $challengeModel::where('expires_at', '<', now())->delete();
     }
 }
