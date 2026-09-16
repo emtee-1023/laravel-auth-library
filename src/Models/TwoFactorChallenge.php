@@ -4,24 +4,20 @@ namespace Markt\LaravelAuth\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Otp extends Model
+class TwoFactorChallenge extends Model
 {
-    protected $table = 'otps';
+    protected $table = 'two_factor_challenges';
 
     protected $fillable = [
-        'phone_number',
-        'purpose',
-        'otp_hash',
+        'user_id',
+        'token',
         'expires_at',
-        'attempts',
-        'verified_at',
     ];
 
     protected function casts(): array
     {
         return [
             'expires_at' => 'datetime',
-            'verified_at' => 'datetime'
         ];
     }
 }
