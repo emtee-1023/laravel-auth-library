@@ -186,6 +186,114 @@ class AuthHttpTest extends TestCase
         ]);
     }
 
+    public function test_resend_otp_endpoint_resends_registration_code(): void
+    {
+        $this->createUser(['phone_verified_at' => null]);
+        $this->seedOtp('0712345678', OtpPurpose::Registration->value);
+
+        $response = $this->postJson('/api/auth/resend-otp', [
+            'purpose' => 'registration',
+            'phone_number' => '0712345678',
+        ]);
+
+        $response->assertOk()
+            ->assertJson(['message' => 'A new verification code has been sent to your phone.']);
+
+        $otps = Otp::where('phone_number', '0712345678')
+            ->where('purpose', OtpPurpose::Registration->value)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(2, $otps);
+        $this->assertNotNull($otps[0]->verified_at);
+        $this->assertNull($otps[1]->verified_at);
+    }
+
+    public function test_resend_otp_endpoint_resends_password_reset_code(): void
+    {
+        $this->createUser();
+        $this->seedOtp('0712345678', OtpPurpose::PasswordReset->value);
+
+        $response = $this->postJson('/api/auth/resend-otp', [
+            'purpose' => 'password_reset',
+            'phone_number' => '0712345678',
+        ]);
+
+        $response->assertOk();
+
+        $otps = Otp::where('phone_number', '0712345678')
+            ->where('purpose', OtpPurpose::PasswordReset->value)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(2, $otps);
+        $this->assertNotNull($otps[0]->verified_at);
+        $this->assertNull($otps[1]->verified_at);
+    }
+
+    public function test_resend_otp_endpoint_does_not_leak_for_unknown_number(): void
+    {
+        $response = $this->postJson('/api/auth/resend-otp', [
+            'purpose' => 'password_reset',
+            'phone_number' => '0799998888',
+        ]);
+
+        $response->assertOk();
+
+        $this->assertDatabaseMissing('otps', ['phone_number' => '0799998888']);
+    }
+
+    public function test_resend_otp_endpoint_resends_2fa_code_for_valid_challenge(): void
+    {
+        $user = $this->createUser();
+
+        TwoFactorSetting::updateOrCreate(
+            ['user_id' => $user->id],
+            ['enabled' => true],
+        );
+
+        $challengeToken = $this->postJson('/api/auth/login', [
+            'phone_number' => '0712345678',
+            'password' => 'password123',
+        ])->json('challenge_token');
+
+        $response = $this->postJson('/api/auth/resend-otp', [
+            'purpose' => 'two_factor',
+            'challenge_token' => $challengeToken,
+        ]);
+
+        $response->assertOk();
+
+        $otps = Otp::where('phone_number', '0712345678')
+            ->where('purpose', OtpPurpose::TwoFactor->value)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(2, $otps);
+        $this->assertNotNull($otps[0]->verified_at);
+        $this->assertNull($otps[1]->verified_at);
+    }
+
+    public function test_resend_otp_endpoint_rejects_invalid_2fa_challenge(): void
+    {
+        $this->createUser();
+
+        $response = $this->postJson('/api/auth/resend-otp', [
+            'purpose' => 'two_factor',
+            'challenge_token' => 'invalid-token',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJson(['message' => 'Invalid or expired verification code.']);
+    }
+
+    public function test_resend_otp_endpoint_validates_input(): void
+    {
+        $this->postJson('/api/auth/resend-otp', [
+            'purpose' => '',
+        ])->assertStatus(422);
+    }
+
     public function test_reset_password_endpoint_updates_password(): void
     {
         $user = $this->createUser();

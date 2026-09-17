@@ -17,6 +17,7 @@ class RateLimitTest extends TestCase
         $app['config']->set('laravel-auth.rate_limits.otp_verification.attempts', 2);
         $app['config']->set('laravel-auth.rate_limits.password_reset.attempts', 2);
         $app['config']->set('laravel-auth.rate_limits.two_factor.attempts', 2);
+        $app['config']->set('laravel-auth.rate_limits.otp_resend.attempts', 2);
     }
 
     public function test_login_endpoint_is_rate_limited(): void
@@ -84,6 +85,23 @@ class RateLimitTest extends TestCase
             'otp' => '999999',
             'password' => 'new-password-1',
             'password_confirmation' => 'new-password-1',
+        ])->assertStatus(429);
+    }
+
+    public function test_resend_otp_endpoint_is_rate_limited(): void
+    {
+        $this->createUser();
+
+        for ($i = 0; $i < 2; $i++) {
+            $this->postJson('/api/auth/resend-otp', [
+                'purpose' => 'password_reset',
+                'phone_number' => '0712345678',
+            ])->assertOk();
+        }
+
+        $this->postJson('/api/auth/resend-otp', [
+            'purpose' => 'password_reset',
+            'phone_number' => '0712345678',
         ])->assertStatus(429);
     }
 
