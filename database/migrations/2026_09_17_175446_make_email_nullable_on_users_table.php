@@ -9,14 +9,33 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('email')->nullable()->change();
+            $table->string('phone_number')
+                ->nullable()
+                ->unique()
+                ->after('id');
+
+            $table->timestamp('phone_verified_at')
+                ->nullable()
+                ->after('phone_number');
+
+            $table->string('email')
+                ->nullable()
+                ->change();
         });
     }
 
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('email')->nullable(false)->change();
+            $table->dropUnique(['phone_number']);
+            $table->dropColumn([
+                'phone_number',
+                'phone_verified_at',
+            ]);
+
+            $table->string('email')
+                ->nullable(false)
+                ->change();
         });
     }
 };
