@@ -306,6 +306,90 @@ class AuthServiceTest extends TestCase
         $this->assertFalse($reset);
     }
 
+    public function test_resend_otp_resends_registration_code_and_invalidates_previous(): void
+    {
+        $this->createUser();
+        $this->seedRegistrationOtp('0712345678', '123456');
+
+        $service = app(AuthService::class);
+
+        $this->assertTrue($service->resendOtp(OtpPurpose::Registration->value, '0712345678'));
+
+        $otps = Otp::where('phone_number', '0712345678')
+            ->where('purpose', OtpPurpose::Registration->value)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(2, $otps);
+        $this->assertNotNull($otps[0]->verified_at);
+        $this->assertNull($otps[1]->verified_at);
+    }
+
+    public function test_resend_otp_resends_password_reset_code_for_existing_user(): void
+    {
+        $this->createUser();
+        $this->seedPasswordResetOtp('0712345678', '123456');
+
+        $service = app(AuthService::class);
+
+        $this->assertTrue($service->resendOtp(OtpPurpose::PasswordReset->value, '0712345678'));
+
+        $otps = Otp::where('phone_number', '0712345678')
+            ->where('purpose', OtpPurpose::PasswordReset->value)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(2, $otps);
+        $this->assertNotNull($otps[0]->verified_at);
+        $this->assertNull($otps[1]->verified_at);
+    }
+
+    public function test_resend_otp_password_reset_returns_true_without_sending_for_unknown_number(): void
+    {
+        $service = app(AuthService::class);
+
+        $this->assertTrue($service->resendOtp(OtpPurpose::PasswordReset->value, '0799998888'));
+
+        $this->assertDatabaseMissing('otps', ['phone_number' => '0799998888']);
+    }
+
+    public function test_resend_otp_resends_two_factor_code_for_valid_challenge(): void
+    {
+        $user = $this->createUser();
+
+        TwoFactorSetting::updateOrCreate(
+            ['user_id' => $user->id],
+            ['enabled' => true],
+        );
+
+        $login = app(AuthService::class)->login('0712345678', 'password123');
+
+        $service = app(AuthService::class);
+
+        $this->assertTrue($service->resendOtp(OtpPurpose::TwoFactor->value, null, $login['challenge_token']));
+
+        $otps = Otp::where('phone_number', '0712345678')
+            ->where('purpose', OtpPurpose::TwoFactor->value)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(2, $otps);
+        $this->assertNotNull($otps[0]->verified_at);
+        $this->assertNull($otps[1]->verified_at);
+    }
+
+    public function test_resend_otp_two_factor_returns_false_for_invalid_challenge(): void
+    {
+        $service = app(AuthService::class);
+
+        $this->assertFalse($service->resendOtp(OtpPurpose::TwoFactor->value, null, 'invalid-token'));
+    }
+
+    public function test_resend_otp_returns_false_for_unknown_purpose(): void
+    {
+        $this->assertFalse(app(AuthService::class)->resendOtp('not-a-purpose'));
+    }
+
     public function test_confirm_two_factor_enables_setting_with_valid_otp(): void
     {
         $user = $this->createUser();

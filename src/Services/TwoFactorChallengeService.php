@@ -41,6 +41,15 @@ class TwoFactorChallengeService
             ->first();
     }
 
+    public function renew($challenge): void
+    {
+        $challenge->update([
+            'expires_at' => now()->addMinutes(
+                config('laravel-auth.two_factor.challenge_expires_in')
+            ),
+        ]);
+    }
+
     public function consume($challenge): void
     {
         $challenge->delete();

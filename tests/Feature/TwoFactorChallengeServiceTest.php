@@ -70,6 +70,21 @@ class TwoFactorChallengeServiceTest extends TestCase
         $this->assertNull($service->findValid('does-not-exist'));
     }
 
+    public function test_renew_refreshes_the_challenge_expiry(): void
+    {
+        $user = $this->createUser();
+
+        $challenge = app(TwoFactorChallengeService::class)->create($user);
+
+        $challenge->update(['expires_at' => now()->addSeconds(5)]);
+
+        app(TwoFactorChallengeService::class)->renew($challenge);
+
+        $this->assertTrue(
+            $challenge->fresh()->expires_at->greaterThan(now()->addMinutes(4))
+        );
+    }
+
     public function test_consume_deletes_the_challenge(): void
     {
         $user = $this->createUser();

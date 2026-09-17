@@ -75,6 +75,18 @@ class LaravelAuthServiceProvider extends ServiceProvider
                 );
         });
 
+        //otp resend rate limiter
+        RateLimiter::for('laravel-auth-otp-resend', function ($request) {
+            return Limit::perMinutes(5, config('laravel-auth.rate_limits.otp_resend.attempts'))
+                ->by(
+                    $request->ip() . '|' . (
+                        $request->input('phone_number')
+                        ?? $request->input('challenge_token')
+                        ?? 'unknown'
+                    )
+                );
+        });
+
         //php artisan command to remove expired otps and 2fa challenges 'php artisan laravel-auth:cleanup' (runs every 10 minutes)
         if ($this->app->runningInConsole()) {
             $this->commands([

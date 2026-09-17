@@ -176,6 +176,85 @@ class AuthService
         $this->otpService->send($phoneNumber, OtpPurpose::PasswordReset);
     }
 
+    public function resendOtp(
+        string $purpose,
+        ?string $phoneNumber = null,
+        ?string $challengeToken = null
+    ): bool {
+        if ($purpose === OtpPurpose::Registration->value) {
+            return $this->resendRegistrationOtp($phoneNumber);
+        }
+
+        if ($purpose === OtpPurpose::PasswordReset->value) {
+            return $this->resendPasswordResetOtp($phoneNumber);
+        }
+
+        if ($purpose === OtpPurpose::TwoFactor->value) {
+            return $this->resendTwoFactorOtp($challengeToken);
+        }
+
+        return false;
+    }
+
+    private function resendRegistrationOtp(?string $phoneNumber): bool
+    {
+        if (!$phoneNumber) {
+            return false;
+        }
+
+        $this->otpService->send($phoneNumber, OtpPurpose::Registration);
+
+        return true;
+    }
+
+    private function resendPasswordResetOtp(?string $phoneNumber): bool
+    {
+        if (!$phoneNumber) {
+            return false;
+        }
+
+        $userModel = config('laravel-auth.models.user');
+
+        // Do not reveal whether the phone number belongs to an account.
+        if (!$userModel::where('phone_number', $phoneNumber)->exists()) {
+            return true;
+        }
+
+        $this->otpService->send($phoneNumber, OtpPurpose::PasswordReset);
+
+        return true;
+    }
+
+    private function resendTwoFactorOtp(?string $challengeToken): bool
+    {
+        if (!$challengeToken) {
+            return false;
+        }
+
+        $challenge = $this->twoFactorChallengeService->findValid($challengeToken);
+
+        if (!$challenge) {
+            return false;
+        }
+
+        $userModel = config('laravel-auth.models.user');
+
+        $user = $userModel::find($challenge->user_id);
+
+        if (!$user || !config('laravel-auth.two_factor.enabled') || !$this->isTwoFactorEnabled($user)) {
+            $this->twoFactorChallengeService->consume($challenge);
+
+            return false;
+        }
+
+        $this->otpService->send($user->phone_number, OtpPurpose::TwoFactor);
+
+        // Keep the challenge usable alongside the freshly issued OTP.
+        $this->twoFactorChallengeService->renew($challenge);
+
+        return true;
+    }
+
     public function resetPassword(string $phoneNumber, string $otp, string $password): bool
     {
         if (!$this->otpService->verify($phoneNumber, $otp, OtpPurpose::PasswordReset)) {

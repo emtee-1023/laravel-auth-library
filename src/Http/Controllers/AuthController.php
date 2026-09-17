@@ -14,6 +14,7 @@ use Markt\LaravelAuth\Http\Requests\EnableTwoFactorRequest;
 use Markt\LaravelAuth\Http\Requests\ConfirmTwoFactorRequest;
 use Markt\LaravelAuth\Http\Requests\DisableTwoFactorRequest;
 use Markt\LaravelAuth\Http\Requests\VerifyTwoFactorRequest;
+use Markt\LaravelAuth\Http\Requests\ResendOtpRequest;
 
 class AuthController
 {
@@ -120,6 +121,25 @@ class AuthController
 
         return response()->json([
             'message' => 'Password reset successfully.',
+        ]);
+    }
+
+    public function resendOtp(ResendOtpRequest $request): JsonResponse
+    {
+        $sent = $this->authService->resendOtp(
+            purpose: $request->string('purpose')->toString(),
+            phoneNumber: $request->string('phone_number')?->toString(),
+            challengeToken: $request->string('challenge_token')?->toString(),
+        );
+
+        if (!$sent) {
+            return response()->json([
+                'message' => 'Invalid or expired verification code.',
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => 'A new verification code has been sent to your phone.',
         ]);
     }
 

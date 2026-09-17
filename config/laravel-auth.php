@@ -36,6 +36,10 @@ return [
             'attempts' => 5,
             'decay_seconds' => 300,
         ],
+        'otp_resend' => [
+            'attempts' => 3,
+            'decay_seconds' => 300,
+        ],
     ],
     'routes' => [
         'prefix' => 'api',

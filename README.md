@@ -419,8 +419,13 @@ return [
             'decay_seconds' => 300,
         ],
 
-        'two_factor' => [
+'two_factor' => [
             'attempts' => 5,
+            'decay_seconds' => 300,
+        ],
+
+        'otp_resend' => [
+            'attempts' => 3,
             'decay_seconds' => 300,
         ],
     ],
@@ -430,8 +435,6 @@ return [
     ],
 ];
 ```
-
-## Publishing configuration
 
 The consuming application can publish the configuration:
 
@@ -605,6 +608,7 @@ Current endpoints include:
 | POST   | `/api/auth/verify-phone`    | Verify phone with OTP  |
 | POST   | `/api/auth/login`           | Login                  |
 | POST   | `/api/auth/forgot-password` | Request password reset |
+| POST   | `/api/auth/resend-otp`      | Resend an OTP          |
 | POST   | `/api/auth/reset-password`  | Reset password         |
 | POST   | `/api/auth/2fa/verify`      | Complete 2FA login     |
 | POST   | `/api/auth/logout`          | Logout                 |
@@ -991,6 +995,61 @@ This means existing sessions are invalidated after a password reset.
 
 ---
 
+# OTP Resend
+
+Sometimes an OTP never arrives (delivery failure) or expires before it is entered.
+
+A user can request a fresh code through:
+
+```text
+POST /api/auth/resend-otp
+```
+
+The endpoint is purpose-driven. Example payloads:
+
+Registration/"verification":
+
+```json
+{
+  "purpose": "registration",
+  "phone_number": "0712345678"
+}
+```
+
+Password reset:
+
+```json
+{
+  "purpose": "password_reset",
+  "phone_number": "0712345678"
+}
+```
+
+2FA login (using the `challenge_token` returned by `/api/auth/login`):
+
+```json
+{
+  "purpose": "two_factor",
+  "challenge_token": "..."
+}
+```
+
+Resending an OTP:
+
+```text
+issues a brand new code
+        ↓
+invalidates the previous unverified code for the same phone number + purpose
+        ↓
+refreshes an active 2FA challenge's expiry
+```
+
+For privacy, password-reset resends return the same generic success message whether or not the phone number belongs to an account, and no code is sent for unknown numbers.
+
+The endpoint is protected by its own rate limiter (`laravel-auth-otp-resend`), keyed by IP address and phone number or challenge token.
+
+---
+
 # Logout
 
 Authenticated users can call:
@@ -1019,6 +1078,9 @@ OTP verification
 5 attempts / 5 minutes
 
 Password reset
+3 attempts / 5 minutes
+
+OTP resend
 3 attempts / 5 minutes
 
 2FA
@@ -1699,6 +1761,7 @@ Then the application immediately has:
 /api/auth/login
 /api/auth/forgot-password
 /api/auth/reset-password
+/api/auth/resend-otp
 /api/auth/2fa/verify
 /api/auth/logout
 /api/auth/user
